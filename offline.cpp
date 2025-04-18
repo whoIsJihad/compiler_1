@@ -14,13 +14,32 @@ static unsigned int SDBMHash(string str)
 
     return hash;
 }
+unsigned long long simpleHash(const std::string& s) {
+    const int p = 31;
+    const int m = 1e9 + 9;
+    unsigned long long hash_value = 0;
+    long long p_pow = 1;
+    for (char c : s) {
+        hash_value = (hash_value + (c - 'a' + 1) * p_pow) % m;
+        p_pow = (p_pow * p) % m;
+    }
+    return hash_value;
+}
+
+unsigned long long djb2(const std::string& str) {
+    unsigned long long hash = 5381;
+    for (char c : str) {
+        hash = ((hash << 5) + hash) + c; // hash * 33 + c
+    }
+    return hash;
+}
+
 class SymbolInfo
 {
 private:
     string name;
     string symbolType;
     SymbolInfo *next;
-
 
 public:
     SymbolInfo(string name, string symbolType)
@@ -59,14 +78,14 @@ public:
 
 class ScopeTable
 {
-    public:
-
+    private:
     int numBuckets;
     SymbolInfo **hashTable;
-    ScopeTable* parentScope;
+    ScopeTable *parentScope;
+    public:
     ScopeTable(int n)
     {
-        hashTable = new SymbolInfo *;
+        hashTable = new SymbolInfo *[n];
         numBuckets = n;
         for (int i = 0; i < numBuckets; i++)
             hashTable[i] = nullptr;
@@ -74,9 +93,9 @@ class ScopeTable
 
     bool Insert(SymbolInfo *symbol)
     {
-        SymbolInfo *findSymbol = this->lookUp(*symbol);
+        SymbolInfo *findSymbol = this->lookUp(symbol->getName());
 
-        if (!findSymbol)
+        if (findSymbol)
             return false;
         string name = symbol->getName();
         int index = SDBMHash(name) % this->numBuckets;
@@ -87,21 +106,13 @@ class ScopeTable
             return true;
         }
 
-        SymbolInfo *prev = nullptr;
-
-        while (temp)
-        {
-            prev = temp;
-            temp = temp->getNext();
-        }
-
-        prev->setNext(symbol);
-        return true;
+        symbol->setNext(hashTable[index]);
+        hashTable[index]=symbol;
+        return  true;
     }
 
-    SymbolInfo *lookUp(SymbolInfo symbolInfo)
+    SymbolInfo *lookUp(string name)
     {
-        string name = symbolInfo.getName();
 
         int index = SDBMHash(name) % this->numBuckets;
 
@@ -118,17 +129,17 @@ class ScopeTable
         return nullptr;
     }
 
-    bool Delete(SymbolInfo symbolInfo)
+    bool Delete(string name)
     {
-        string name = symbolInfo.getName();
 
         int index = SDBMHash(name) % this->numBuckets;
 
         SymbolInfo *temp = hashTable[index];
         SymbolInfo *prev = nullptr;
-        if (temp->getName() == name)
+        if (temp && temp->getName() == name)
         {
             hashTable[index] = temp->getNext();
+            delete temp;
             return true;
         }
         while (temp)
@@ -153,8 +164,17 @@ class ScopeTable
             while (temp)
             {
                 cout << temp->getName() << " " << temp->getType() << endl;
+                temp = temp->getNext();
             }
         }
+    }
+
+    void setParentScope(ScopeTable * scopeTable){
+        this->parentScope=scopeTable;
+    }
+
+    ScopeTable* getParentScope(){
+        return this->parentScope;
     }
     ~ScopeTable()
     {
@@ -166,11 +186,65 @@ class ScopeTable
             while (temp)
             {
                 prev = temp;
-                delete prev;
                 temp = temp->getNext();
+                delete prev;
             }
         }
         delete[] hashTable;
+    }
+};
+
+
+class SymbolTable{
+    private:
+    ScopeTable*  currentScopeTable;
+    SymbolTable(ScopeTable *currentScopeTable){
+        this->currentScopeTable=currentScopeTable;
+    }
+    SymbolTable(){
+        this->currentScopeTable=nullptr;
+    }
+    void enterScope(){
+        ScopeTable *newScopeTable=new ScopeTable(10);
+        newScopeTable->setParentScope(currentScopeTable);
+        currentScopeTable=newScopeTable;
+    }
+
+    void removeScope(){
+        ScopeTable* toDelete=currentScopeTable;
+        currentScopeTable=currentScopeTable->getParentScope();
+        delete toDelete;
+    }
+
+    bool insert(SymbolInfo* symbol){
+        return this->currentScopeTable->Insert(symbol);
+    }
+
+    bool remove(string name){
+        return currentScopeTable->Delete(name);
+
+    }
+
+    void printCurrentScopeTable(){
+        currentScopeTable->Print();
+    }
+
+    void printAllScopeTable(){
+        ScopeTable* temp=currentScopeTable;
+        while(temp){
+            temp->Print();
+            temp=temp->getParentScope();
+        }
+    }
+    SymbolInfo* LookUp(string name){
+        ScopeTable * temp=currentScopeTable;
+
+        while(temp){
+            SymbolInfo * symbol=temp->lookUp(name);
+            if(symbol) return symbol;
+            temp=temp->getParentScope();
+        }
+        return nullptr;
     }
 };
 int main()
@@ -193,7 +267,7 @@ int main()
 
     // Look up symbols
     cout << "Looking up symbols..." << endl;
-    SymbolInfo *foundSymbol = scopeTable.lookUp(*symbol1);
+    SymbolInfo *foundSymbol = scopeTable.lookUp(symbol1->getName());
     if (foundSymbol)
         cout << "Found: " << foundSymbol->getName() << " " << foundSymbol->getType() << endl;
     else
@@ -201,15 +275,13 @@ int main()
 
     // Delete a symbol
     cout << "Deleting symbol 'y'..." << endl;
-    if (scopeTable.Delete(*symbol2))
+    if (scopeTable.Delete(symbol2->getName()))
         cout << "Symbol 'y' deleted successfully." << endl;
     else
         cout << "Failed to delete symbol 'y'." << endl;
 
-    // Print the scope table again
+    // // Print the scope table again
     cout << "Printing ScopeTable after deletion:" << endl;
     scopeTable.Print();
-
     return 0;
-
 }
