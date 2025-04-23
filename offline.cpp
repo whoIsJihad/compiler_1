@@ -1,287 +1,162 @@
-#include <bits/stdc++.h>
+#include <iostream>
+#include <limits>
 
-using namespace std;
-static unsigned int SDBMHash(string str)
+#include "HashFunctions.h"
+#include "SymbolTable.h"
+#include "Tokenizer.h"
+
+unsigned int (*hash_func)(std::string, unsigned int) = SDBMHash; // Define the default hash function
+
+int main(int argc, char* argv[])
 {
-    unsigned int hash = 0;
-    unsigned int i = 0;
-    unsigned int len = str.length();
-
-    for (i = 0; i < len; i++)
+    std::string input, output, hash_name;
+    if (argc == 3)
     {
-        hash = (str[i]) + (hash << 6) + (hash << 16) - hash;
-    }
 
-    return hash;
-}
-unsigned long long simpleHash(const std::string& s) {
-    const int p = 31;
-    const int m = 1e9 + 9;
-    unsigned long long hash_value = 0;
-    long long p_pow = 1;
-    for (char c : s) {
-        hash_value = (hash_value + (c - 'a' + 1) * p_pow) % m;
-        p_pow = (p_pow * p) % m;
+        input = argv[1];
+        output = argv[2];
+        hash_func = SDBMHash;
     }
-    return hash_value;
-}
-
-unsigned long long djb2(const std::string& str) {
-    unsigned long long hash = 5381;
-    for (char c : str) {
-        hash = ((hash << 5) + hash) + c; // hash * 33 + c
-    }
-    return hash;
-}
-
-class SymbolInfo
-{
-private:
-    string name;
-    string symbolType;
-    SymbolInfo *next;
-
-public:
-    SymbolInfo(string name, string symbolType)
+    else if (argc == 4)
     {
-        this->name = name;
-        this->next = nullptr;
-        this->symbolType = symbolType;
-    }
-    string getName()
-    {
-        return this->name;
-    }
-    string getType()
-    {
-        return this->symbolType;
-    }
-
-    void setName(string name)
-    {
-        this->name = name;
-    }
-    void setType(string symbolType)
-    {
-        this->symbolType = symbolType;
-    }
-
-    SymbolInfo *getNext()
-    {
-        return this->next;
-    }
-    void setNext(SymbolInfo *next)
-    {
-        this->next = next;
-    }
-};
-
-class ScopeTable
-{
-    private:
-    int numBuckets;
-    SymbolInfo **hashTable;
-    ScopeTable *parentScope;
-    public:
-    ScopeTable(int n)
-    {
-        hashTable = new SymbolInfo *[n];
-        numBuckets = n;
-        for (int i = 0; i < numBuckets; i++)
-            hashTable[i] = nullptr;
-    }
-
-    bool Insert(SymbolInfo *symbol)
-    {
-        SymbolInfo *findSymbol = this->lookUp(symbol->getName());
-
-        if (findSymbol)
-            return false;
-        string name = symbol->getName();
-        int index = SDBMHash(name) % this->numBuckets;
-        SymbolInfo *temp = hashTable[index];
-        if (temp == nullptr)
+        input = argv[1];
+        output = argv[2];
+        hash_name = argv[3];
+        if (hash_name == "SDBMHash")
         {
-            hashTable[index] = symbol;
-            return true;
+            hash_func = SDBMHash;
         }
-
-        symbol->setNext(hashTable[index]);
-        hashTable[index]=symbol;
-        return  true;
-    }
-
-    SymbolInfo *lookUp(string name)
-    {
-
-        int index = SDBMHash(name) % this->numBuckets;
-
-        SymbolInfo *temp = hashTable[index];
-
-        while (temp)
+        else if (hash_name == "simpleHash")
         {
-            if (temp->getName() == name)
+            hash_func = simpleHash;
+        }
+        else if (hash_name == "djb2")
+        {
+            hash_func = djb2;
+        }
+    }
+    std::cout << input << " " << output << " " << hash_name << std::endl;
+
+    freopen(input.c_str(), "r", stdin);
+    freopen(output.c_str(), "w", stdout);
+    int numberOfBuckets;
+    std::cin >> numberOfBuckets;
+    
+    ScopeTable* currentScopeTable = new ScopeTable(numberOfBuckets);
+    std::cout << "\tScopeTable# " << currentScopeTable->getID() << " created" << std::endl;
+    SymbolTable* symbolTable = new SymbolTable(currentScopeTable);
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+    int cmdCount = 1;
+
+    while (true)
+    {
+        std::string cmd;
+        std::getline(std::cin, cmd);
+        std::cout << "Cmd " << cmdCount++ << ": " << cmd << "\n";
+        Tokenizer tokenizer(cmd);
+        TokenArray tokenisedCommand = tokenizer.getTokens();
+        char ch = tokenisedCommand.tokens[0][0];
+        switch (ch)
+        {
+        case 'I':
+        {
+            std::string symbolName, symbolType;
+            symbolName = tokenisedCommand.tokens[1];
+            if (tokenisedCommand.size > 2)
+                symbolType = tokenisedCommand.tokens[2];
+            else
+                symbolType = "";
+            std::string res = "";
+            if (symbolType == "FUNCTION")
             {
-                return temp;
+                int numTokens = tokenisedCommand.size;
+                res += "," + tokenisedCommand.tokens[numTokens - 1] + "<==(";
+                for (int i = 3; i < numTokens - 1; i++)
+                {
+                    res += (tokenisedCommand.tokens[i] + ",");
+                }
+                res.pop_back();
+                res.push_back(')');
             }
-            temp = temp->getNext();
-        }
-        return nullptr;
-    }
 
-    bool Delete(string name)
-    {
-
-        int index = SDBMHash(name) % this->numBuckets;
-
-        SymbolInfo *temp = hashTable[index];
-        SymbolInfo *prev = nullptr;
-        if (temp && temp->getName() == name)
-        {
-            hashTable[index] = temp->getNext();
-            delete temp;
-            return true;
-        }
-        while (temp)
-        {
-            if (temp->getName() == name)
+            if (symbolType == "STRUCT" || symbolType == "UNION")
             {
-                // prev
-                prev->setNext(temp->getNext());
-                delete temp;
-                return true;
+                int numTokens = tokenisedCommand.size;
+                res += ",{";
+                for (int i = 3; i < numTokens - 1; i = i + 2)
+                {
+                    res += ("(" + tokenisedCommand.tokens[i] + "," + tokenisedCommand.tokens[i + 1] + "),");
+                }
+                res.pop_back();
+                res += "}";
             }
-            prev = temp;
-            temp = temp->getNext();
+
+            SymbolInfo* symbol = new SymbolInfo(symbolName, symbolType + res);
+            bool insertTed=symbolTable->Insert(symbol);
+            if(!insertTed) delete symbol;
+            break;
         }
-        return false;
-    }
-    void Print()
-    {
-        for (int i = 0; i < numBuckets; i++)
+        case 'L':
         {
-            SymbolInfo *temp = hashTable[i];
-            while (temp)
+            if (tokenisedCommand.size != 2)
             {
-                cout << temp->getName() << " " << temp->getType() << endl;
-                temp = temp->getNext();
+                std::cout << "\tNumber of parameters mismatch for the command L" << std::endl;
+                break;
             }
+            std::string name = tokenisedCommand.tokens[1];
+            SymbolInfo* symbol = symbolTable->LookUp(name);
+            break;
         }
-    }
-
-    void setParentScope(ScopeTable * scopeTable){
-        this->parentScope=scopeTable;
-    }
-
-    ScopeTable* getParentScope(){
-        return this->parentScope;
-    }
-    ~ScopeTable()
-    {
-        for (int i = 0; i < numBuckets; i++)
+        case 'D':
         {
-            SymbolInfo *temp = hashTable[i];
-            SymbolInfo *prev = nullptr;
-
-            while (temp)
+            if (tokenisedCommand.size != 2)
             {
-                prev = temp;
-                temp = temp->getNext();
-                delete prev;
+                std::cout << "Number of parameters mismatch for the command D" << std::endl;
+                break;
             }
+            std::string name = tokenisedCommand.tokens[1];
+            symbolTable->remove(name);
+            break;
         }
-        delete[] hashTable;
-    }
-};
-
-
-class SymbolTable{
-    private:
-    ScopeTable*  currentScopeTable;
-    SymbolTable(ScopeTable *currentScopeTable){
-        this->currentScopeTable=currentScopeTable;
-    }
-    SymbolTable(){
-        this->currentScopeTable=nullptr;
-    }
-    void enterScope(){
-        ScopeTable *newScopeTable=new ScopeTable(10);
-        newScopeTable->setParentScope(currentScopeTable);
-        currentScopeTable=newScopeTable;
-    }
-
-    void removeScope(){
-        ScopeTable* toDelete=currentScopeTable;
-        currentScopeTable=currentScopeTable->getParentScope();
-        delete toDelete;
-    }
-
-    bool insert(SymbolInfo* symbol){
-        return this->currentScopeTable->Insert(symbol);
-    }
-
-    bool remove(string name){
-        return currentScopeTable->Delete(name);
-
-    }
-
-    void printCurrentScopeTable(){
-        currentScopeTable->Print();
-    }
-
-    void printAllScopeTable(){
-        ScopeTable* temp=currentScopeTable;
-        while(temp){
-            temp->Print();
-            temp=temp->getParentScope();
+        case 'P':
+        {
+            char option = tokenisedCommand.tokens[1][0];
+            if (option == 'C')
+            {
+                symbolTable->printCurrentScopeTable();
+            }
+            else if (option == 'A')
+            {
+                symbolTable->printAllScopeTable();
+            }
+            break;
         }
-    }
-    SymbolInfo* LookUp(string name){
-        ScopeTable * temp=currentScopeTable;
-
-        while(temp){
-            SymbolInfo * symbol=temp->lookUp(name);
-            if(symbol) return symbol;
-            temp=temp->getParentScope();
+        case 'S':
+        {
+            symbolTable->enterScope();
+            break;
         }
-        return nullptr;
+        case 'E':
+        {
+            symbolTable->exitScope();
+            break;
+        }
+        case 'Q':
+        {
+            delete symbolTable;
+            std::cout << "Exiting program." << std::endl;
+            return 0;
+        }
+        default:
+        {
+            std::cout << "Invalid command." << std::endl;
+            break;
+        }
+
+        }
+        
     }
-};
-int main()
-{
-    ScopeTable scopeTable(10);
 
-    // Insert symbols
-    SymbolInfo *symbol1 = new SymbolInfo("x", "int");
-    SymbolInfo *symbol2 = new SymbolInfo("y", "float");
-    SymbolInfo *symbol3 = new SymbolInfo("z", "char");
-
-    cout << "Inserting symbols..." << endl;
-    scopeTable.Insert(symbol1);
-    scopeTable.Insert(symbol2);
-    scopeTable.Insert(symbol3);
-
-    // Print the scope table
-    cout << "Printing ScopeTable:" << endl;
-    scopeTable.Print();
-
-    // Look up symbols
-    cout << "Looking up symbols..." << endl;
-    SymbolInfo *foundSymbol = scopeTable.lookUp(symbol1->getName());
-    if (foundSymbol)
-        cout << "Found: " << foundSymbol->getName() << " " << foundSymbol->getType() << endl;
-    else
-        cout << "Symbol not found." << endl;
-
-    // Delete a symbol
-    cout << "Deleting symbol 'y'..." << endl;
-    if (scopeTable.Delete(symbol2->getName()))
-        cout << "Symbol 'y' deleted successfully." << endl;
-    else
-        cout << "Failed to delete symbol 'y'." << endl;
-
-    // // Print the scope table again
-    cout << "Printing ScopeTable after deletion:" << endl;
-    scopeTable.Print();
     return 0;
 }

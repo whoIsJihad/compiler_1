@@ -1,0 +1,7 @@
+7
+I foo FUNCTION INT INT FLOAT INT
+L j
+I i VAR
+L i
+L i j
+Q

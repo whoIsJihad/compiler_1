@@ -1,2 +1,1 @@
- cout << "Printing ScopeTable after deletion:" << endl;
-    scopeTable.Print();
+int index = SDBMHash(name) % this->numBuckets;

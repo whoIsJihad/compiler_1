@@ -1,0 +1,22 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Build with g++",
+        "type": "shell",
+        "command": "g++",
+        "args": [
+          "-g",                  // Enable debugging symbols
+          "offline.cpp",
+          "-o",
+          "offline"
+        ],
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "problemMatcher": ["$gcc"]
+      }
+    ]
+  }
+  
