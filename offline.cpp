@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
     std::cin >> numberOfBuckets;
     
     ScopeTable* currentScopeTable = new ScopeTable(numberOfBuckets);
-    std::cout << "\tScopeTable# " << currentScopeTable->getID() << " created" << std::endl;
+    std::cout << "\n\tScopeTable# " << currentScopeTable->getID() << " created" << std::endl;
     SymbolTable* symbolTable = new SymbolTable(currentScopeTable);
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
@@ -51,6 +51,7 @@ int main(int argc, char* argv[])
 
     while (true)
     {
+        
         std::string cmd;
         std::getline(std::cin, cmd);
         std::cout << "Cmd " << cmdCount++ << ": " << cmd << "\n";
@@ -71,8 +72,8 @@ int main(int argc, char* argv[])
             if (symbolType == "FUNCTION")
             {
                 int numTokens = tokenisedCommand.size;
-                res += "," + tokenisedCommand.tokens[numTokens - 1] + "<==(";
-                for (int i = 3; i < numTokens - 1; i++)
+                res += "," + tokenisedCommand.tokens[3] + "<==(";
+                for (int i = 4; i < numTokens ; i++)
                 {
                     res += (tokenisedCommand.tokens[i] + ",");
                 }
@@ -112,7 +113,7 @@ int main(int argc, char* argv[])
         {
             if (tokenisedCommand.size != 2)
             {
-                std::cout << "Number of parameters mismatch for the command D" << std::endl;
+                std::cout << "\tNumber of parameters mismatch for the command D" << std::endl;
                 break;
             }
             std::string name = tokenisedCommand.tokens[1];
@@ -145,11 +146,11 @@ int main(int argc, char* argv[])
         case 'Q':
         {
             delete symbolTable;
-            std::cout << "Exiting program." << std::endl;
             return 0;
         }
         default:
         {
+
             std::cout << "Invalid command." << std::endl;
             break;
         }
